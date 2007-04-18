@@ -1,0 +1,4 @@
+Revision history for Perl extension LWP::UserAgent::Cache::Memcached.
+
+0.01  2007.04.18
+	- first version;
