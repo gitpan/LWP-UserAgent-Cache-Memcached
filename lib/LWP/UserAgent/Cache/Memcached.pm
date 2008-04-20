@@ -3,10 +3,11 @@ package LWP::UserAgent::Cache::Memcached;
 use strict;
 use warnings;
 use base qw(LWP::UserAgent);
-use Cache::Memcached;
+use Module::Load;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
+our $FAST = 1;
 our %default_cache_args = (
 	'servers' => [ "127.0.0.1:11211" ],
 	'namespace' => 'lwp-cache',
@@ -22,17 +23,40 @@ sub new {
 		exptime => $cache_args{exptime},
 	};
 	delete $cache_args{exptime};
-	$self->{cache} = Cache::Memcached->new(\%cache_args);
+	$self->{cache} = $self->cacher->new(\%cache_args);
 	return $self
+}
+
+sub cacher {
+	my @cacher = qw/Cache::Memcached::Fast Cache::Memcached/;
+	my $cacher;
+
+	if ($FAST) {
+		$cacher = $cacher[0];
+		eval {load $cacher};
+		if ($@) {
+			$cacher = $cacher[1];
+			eval {load $cacher};
+			$FAST = 0;
+		}
+	}
+	else {
+		$cacher = $cacher[1];
+		eval {load $cacher};
+	}
+
+	return $cacher;
 }
 
 sub request {
 	my $self = shift;
 	my @args = @_;
 	my $request = $args[0];
+
+	return $self->SUPER::request(@args) if $request->method ne 'GET';
+
 	my $uri = $request->uri->as_string;
 	my $cache = $self->{cache};
-
 	my $obj = $cache->get( $uri );
 
 	if ( defined $obj ) {
@@ -86,7 +110,7 @@ LWP::UserAgent::Cache::Memcached - LWP::UserAgent extension with memcached
 
   use LWP::UserAgent::Cache::Memcached;
   my %cache_opt = (
-    'namespace' => 'lwp-cache',
+    'namespace' => 'lwp-cache:',
     'servers' => [ "10.0.0.15:11211", "10.0.0.15:11212", "/var/sock/memcached",
                    "10.0.0.17:11211", [ "10.0.0.17:11211", 3 ] ],
     'compress_threshold' => 10_000,
@@ -100,11 +124,12 @@ LWP::UserAgent::Cache::Memcached - LWP::UserAgent extension with memcached
 
 LWP::UserAgent::Cache::Memcached is a LWP::UserAgent extention.
 It handle 'If-Modified-Since' request header with memcached.
-memcached are implemented by Cache::Memcached.
+memcached are implemented by Cache::Memcached or Cache::Memcached::Fast.
+When you use this module, this module tries to use Cache::Memcached::Fast. If this call is fail, it uses Cache::Memcached.
 
 =head1 SEE ALSO
 
-L<LWP::UserAgent>, L<Cache::Memcached>
+L<LWP::UserAgent>, L<Cache::Memcached>, L<Cache::Memcached::Fast>
 
 =head1 AUTHOR
 
@@ -114,7 +139,7 @@ Kazuma Shiraiwa
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007 by Kazuma Shiraiwa.
+Copyright (C) 2007,2008 by Kazuma Shiraiwa.
 This program is free software; you may redistribute it and/or modify it
 under the same terms as Perl itself.
 

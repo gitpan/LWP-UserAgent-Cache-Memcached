@@ -5,7 +5,8 @@ WriteMakefile(
     PREREQ_PM         => {
         'Test::More'  => '0',
         'LWP::UserAgent' => 0,
-        'Cache::Memcached'    => '0',
+        'Cache::Memcached' => '0',
+        'Module::Load' => '0',
     },
 );
 
